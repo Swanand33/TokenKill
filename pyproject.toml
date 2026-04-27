@@ -1,0 +1,85 @@
+[project]
+name = "tokenkill"
+version = "0.1.0"
+description = "Local-first cost governor and loop circuit breaker for AI coding agents"
+authors = [{ name = "Swanand Potnis", email = "workwithswanand@gmail.com" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["ai", "llm", "agents", "cost", "proxy", "claude", "cursor", "openai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Debuggers",
+]
+
+dependencies = [
+    "httpx==0.27.2",
+    "fastapi==0.115.5",
+    "uvicorn[standard]==0.32.1",
+    "aiosqlite==0.20.0",
+    "click==8.1.7",
+    "pydantic==2.10.3",
+    "tiktoken==0.8.0",
+    "structlog==24.4.0",
+    "python-dotenv==1.0.1",
+    "websockets==13.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+    "pytest-cov==6.0.0",
+    "ruff==0.8.4",
+    "black==24.10.0",
+    "mypy==1.13.0",
+    "httpx[http2]==0.27.2",
+    "respx==0.21.1",
+]
+
+[project.scripts]
+tokenkill = "tokenkill.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/swanandpotnis/tokenkill"
+Issues = "https://github.com/swanandpotnis/tokenkill/issues"
+
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "RUF"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311", "py312"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["src/tokenkill"]
+omit = ["tests/*"]

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TokenKill Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body { background: #0f172a; color: #e2e8f0; font-family: 'Menlo', 'Monaco', monospace; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; }
+    .badge-warning { background: #f59e0b22; color: #fbbf24; border: 1px solid #f59e0b44; }
+    .badge-kill    { background: #ef444422; color: #f87171; border: 1px solid #ef444444; }
+    .badge-ok      { background: #10b98122; color: #34d399; border: 1px solid #10b98144; }
+    .progress-bar  { height: 6px; border-radius: 3px; background: #334155; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+    .event-row:nth-child(even) { background: #1e293b55; }
+    #alert-banner { display: none; }
+  </style>
+</head>
+<body class="min-h-screen p-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-xl font-bold text-white">⚡ TokenKill</h1>
+      <p class="text-slate-400 text-xs mt-1" id="session-id">Connecting...</p>
+    </div>
+    <div class="flex gap-3 items-center">
+      <span id="status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+      <span id="status-text" class="text-xs text-slate-400">Disconnected</span>
+    </div>
+  </div>
+
+  <!-- Alert Banner -->
+  <div id="alert-banner" class="mb-4 p-3 rounded-lg text-sm font-medium"></div>
+
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="card">
+      <div class="text-slate-400 text-xs mb-1">Session Cost</div>
+      <div class="text-2xl font-bold text-white" id="session-cost">$0.0000</div>
+      <div class="text-xs text-slate-500 mt-1" id="burn-rate">—</div>
+    </div>
+    <div class="card">
+      <div class="text-slate-400 text-xs mb-1">Input Tokens</div>
+      <div class="text-2xl font-bold text-blue-400" id="input-tokens">0</div>
+    </div>
+    <div class="card">
+      <div class="text-slate-400 text-xs mb-1">Output Tokens</div>
+      <div class="text-2xl font-bold text-purple-400" id="output-tokens">0</div>
+    </div>
+    <div class="card">
+      <div class="text-slate-400 text-xs mb-1">Requests</div>
+      <div class="text-2xl font-bold text-slate-200" id="request-count">0</div>
+    </div>
+  </div>
+
+  <!-- Budget Bar -->
+  <div class="card mb-6" id="budget-section">
+    <div class="flex justify-between items-center mb-2">
+      <span class="text-xs text-slate-400">Budget</span>
+      <span class="text-xs" id="budget-label">No cap set</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill bg-green-500" id="budget-fill" style="width:0%"></div>
+    </div>
+    <div class="text-xs text-slate-500 mt-1" id="budget-eta"></div>
+  </div>
+
+  <!-- Charts + Cost Tree -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div class="card">
+      <div class="text-xs text-slate-400 mb-3">Cost Over Time</div>
+      <canvas id="cost-chart" height="140"></canvas>
+    </div>
+    <div class="card">
+      <div class="text-xs text-slate-400 mb-3">Cost by Provider</div>
+      <canvas id="provider-chart" height="140"></canvas>
+    </div>
+  </div>
+
+  <!-- Cost Tree -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div class="card">
+      <div class="text-xs text-slate-400 mb-3">Top Tools (by cost)</div>
+      <div id="tool-list" class="text-xs space-y-1"></div>
+    </div>
+    <div class="card">
+      <div class="text-xs text-slate-400 mb-3">Top Files (by read cost)</div>
+      <div id="file-list" class="text-xs space-y-1"></div>
+    </div>
+  </div>
+
+  <!-- Recent Events -->
+  <div class="card">
+    <div class="text-xs text-slate-400 mb-3">Recent Events</div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-slate-500 border-b border-slate-700">
+            <th class="text-left pb-2">Time</th>
+            <th class="text-left pb-2">Provider</th>
+            <th class="text-left pb-2">Model</th>
+            <th class="text-right pb-2">In</th>
+            <th class="text-right pb-2">Out</th>
+            <th class="text-right pb-2">Cost</th>
+            <th class="text-left pb-2">Tool</th>
+          </tr>
+        </thead>
+        <tbody id="events-table"></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+  // ---- State ----
+  let totalCost = 0, inputTokens = 0, outputTokens = 0, requestCount = 0;
+  let costHistory = [], providerCosts = {}, toolCosts = {}, fileCosts = {};
+  let sessionId = null;
+
+  // ---- Charts ----
+  const costCtx = document.getElementById('cost-chart').getContext('2d');
+  const costChart = new Chart(costCtx, {
+    type: 'line',
+    data: { labels: [], datasets: [{ label: 'Cost $', data: [], borderColor: '#34d399', tension: 0.4, fill: true, backgroundColor: '#34d39922', pointRadius: 2 }] },
+    options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } }, y: { ticks: { color: '#64748b', font: { size: 10 }, callback: v => '$' + v.toFixed(4) }, grid: { color: '#334155' } } }, animation: false }
+  });
+
+  const provCtx = document.getElementById('provider-chart').getContext('2d');
+  const provChart = new Chart(provCtx, {
+    type: 'doughnut',
+    data: { labels: [], datasets: [{ data: [], backgroundColor: ['#34d399','#60a5fa','#f59e0b','#a78bfa'] }] },
+    options: { plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } }, animation: false }
+  });
+
+  // ---- WebSocket ----
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}/dashboard/ws`);
+
+    ws.onopen = () => {
+      document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-green-400';
+      document.getElementById('status-text').textContent = 'Live';
+      loadCurrent();
+    };
+
+    ws.onclose = () => {
+      document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
+      document.getElementById('status-text').textContent = 'Disconnected';
+      setTimeout(connect, 3000);
+    };
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'cost_event') handleEvent(msg);
+    };
+
+    setInterval(() => { if (ws.readyState === 1) ws.send('ping'); }, 20000);
+  }
+
+  // ---- Load current session on connect ----
+  async function loadCurrent() {
+    const r = await fetch('/dashboard/api/current');
+    const data = await r.json();
+    if (!data.active) return;
+
+    const s = data.session;
+    sessionId = s.id;
+    document.getElementById('session-id').textContent = `Session: ${s.id.slice(0,8)}...  |  Project: ${s.project}`;
+    totalCost = s.total_cost_usd;
+    inputTokens = s.total_input_tokens;
+    outputTokens = s.total_output_tokens;
+    requestCount = s.event_count;
+
+    if (data.cost_tree) {
+      providerCosts = data.cost_tree.by_provider || {};
+      toolCosts = data.cost_tree.by_tool || {};
+      fileCosts = data.cost_tree.by_file || {};
+    }
+
+    renderAll();
+  }
+
+  // ---- Handle incoming event ----
+  function handleEvent(msg) {
+    const ev = msg.event;
+    const budget = msg.budget;
+
+    totalCost += ev.cost_usd;
+    inputTokens += ev.usage.input_tokens;
+    outputTokens += ev.usage.output_tokens;
+    requestCount += 1;
+
+    providerCosts[ev.provider] = (providerCosts[ev.provider] || 0) + ev.cost_usd;
+    if (ev.tool_name) toolCosts[ev.tool_name] = (toolCosts[ev.tool_name] || 0) + ev.cost_usd;
+    if (ev.file_path) fileCosts[ev.file_path] = (fileCosts[ev.file_path] || 0) + ev.cost_usd;
+
+    costHistory.push({ time: new Date().toLocaleTimeString(), cost: totalCost });
+    if (costHistory.length > 60) costHistory.shift();
+
+    renderAll();
+    renderBudget(budget);
+    prependEvent(ev);
+
+    if (msg.loop_alert) showAlert(msg.loop_alert);
+    else clearAlert();
+  }
+
+  function renderAll() {
+    document.getElementById('session-cost').textContent = '$' + totalCost.toFixed(4);
+    document.getElementById('input-tokens').textContent = inputTokens.toLocaleString();
+    document.getElementById('output-tokens').textContent = outputTokens.toLocaleString();
+    document.getElementById('request-count').textContent = requestCount.toLocaleString();
+
+    // Cost chart
+    costChart.data.labels = costHistory.map(h => h.time);
+    costChart.data.datasets[0].data = costHistory.map(h => h.cost);
+    costChart.update();
+
+    // Provider doughnut
+    const pKeys = Object.keys(providerCosts);
+    provChart.data.labels = pKeys;
+    provChart.data.datasets[0].data = pKeys.map(k => providerCosts[k]);
+    provChart.update();
+
+    // Tool list
+    renderCostList('tool-list', toolCosts);
+    renderCostList('file-list', fileCosts);
+  }
+
+  function renderCostList(elId, costs) {
+    const el = document.getElementById(elId);
+    const sorted = Object.entries(costs).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    if (!sorted.length) { el.innerHTML = '<span class="text-slate-600">No data yet</span>'; return; }
+    const max = sorted[0][1];
+    el.innerHTML = sorted.map(([k, v]) => `
+      <div class="event-row flex justify-between items-center py-1 px-1 rounded">
+        <span class="text-slate-300 truncate max-w-[200px]" title="${k}">${k}</span>
+        <span class="text-green-400 ml-2 shrink-0">$${v.toFixed(4)}</span>
+      </div>`).join('');
+  }
+
+  function renderBudget(b) {
+    if (!b.session_cap && !b.project_cap) {
+      document.getElementById('budget-label').textContent = 'No cap set';
+      return;
+    }
+    const pct = b.session_pct || b.project_pct || 0;
+    const pctDisplay = Math.min(pct * 100, 100).toFixed(1);
+    document.getElementById('budget-label').textContent =
+      `$${(b.session_spent).toFixed(4)} / $${(b.session_cap || b.project_cap).toFixed(2)} (${pctDisplay}%)`;
+
+    const fill = document.getElementById('budget-fill');
+    fill.style.width = pctDisplay + '%';
+    fill.className = 'progress-fill ' + (pct >= 1.0 ? 'bg-red-500' : pct >= 0.8 ? 'bg-yellow-400' : 'bg-green-500');
+
+    if (b.estimated_minutes_remaining != null) {
+      document.getElementById('budget-eta').textContent = `~${b.estimated_minutes_remaining.toFixed(0)} min remaining`;
+    }
+    if (b.burn_rate) {
+      document.getElementById('burn-rate').textContent = `$${b.burn_rate.toFixed(4)}/min`;
+    }
+  }
+
+  function prependEvent(ev) {
+    const tbody = document.getElementById('events-table');
+    const time = new Date(ev.timestamp).toLocaleTimeString();
+    const row = document.createElement('tr');
+    row.className = 'event-row border-b border-slate-800';
+    row.innerHTML = `
+      <td class="py-1 text-slate-500">${time}</td>
+      <td class="py-1 text-blue-400">${ev.provider}</td>
+      <td class="py-1 text-slate-300 truncate max-w-[120px]">${ev.model}</td>
+      <td class="py-1 text-right text-slate-300">${(ev.usage.input_tokens||0).toLocaleString()}</td>
+      <td class="py-1 text-right text-slate-300">${(ev.usage.output_tokens||0).toLocaleString()}</td>
+      <td class="py-1 text-right text-green-400">$${ev.cost_usd.toFixed(4)}</td>
+      <td class="py-1 text-slate-500 truncate max-w-[100px]">${ev.tool_name || '—'}</td>`;
+    tbody.prepend(row);
+    // Keep only last 50 rows
+    while (tbody.rows.length > 50) tbody.deleteRow(tbody.rows.length - 1);
+  }
+
+  function showAlert(alert) {
+    const banner = document.getElementById('alert-banner');
+    banner.style.display = 'block';
+    banner.className = 'mb-4 p-3 rounded-lg text-sm font-medium ' +
+      (alert.level === 'kill' ? 'badge-kill' : alert.level === 'pause' ? 'badge-warning' : 'badge-warning');
+    banner.textContent = '⚠ ' + alert.message;
+  }
+
+  function clearAlert() {
+    document.getElementById('alert-banner').style.display = 'none';
+  }
+
+  connect();
+</script>
+</body>
+</html>
