@@ -70,6 +70,7 @@ build/
 
 # Claude Code internal — never push these
 CLAUDE.md
+AGENTS.md
 log.txt
 .claude/
 memory/
