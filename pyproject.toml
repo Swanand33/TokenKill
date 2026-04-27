@@ -31,14 +31,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest==8.3.4",
-    "pytest-asyncio==0.24.0",
-    "pytest-cov==6.0.0",
-    "ruff==0.8.4",
-    "black==24.10.0",
-    "mypy==1.13.0",
-    "httpx[http2]==0.27.2",
-    "respx==0.21.1",
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "black>=24.0.0",
+    "mypy>=1.13.0",
+    "httpx[http2]>=0.27.0",
+    "respx>=0.21.0",
 ]
 
 [project.scripts]
@@ -49,8 +49,8 @@ Homepage = "https://github.com/swanandpotnis/tokenkill"
 Issues = "https://github.com/swanandpotnis/tokenkill/issues"
 
 [build-system]
-requires = ["setuptools>=75.0", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]

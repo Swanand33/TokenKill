@@ -119,10 +119,10 @@ async def test_loop_pause_returns_429(db, tracker):
     app = create_proxy_app(config=config, db=db, tracker=tracker,
                            loop_detector=loop_det, budget=budget)
 
-    # Pre-fill window to trigger pause threshold (>5 identical hashes)
-    fixed_hash = "aabbccdd11223344"
+    # Pre-fill window with the actual hash of ANTHROPIC_REQUEST to trigger pause
+    real_hash = loop_det.hash_request(ANTHROPIC_REQUEST)
     for _ in range(6):
-        loop_det._window.append(fixed_hash)
+        loop_det._window.append(real_hash)
 
     respx.post("https://api.anthropic.com/v1/messages").mock(
         return_value=httpx.Response(200, json=ANTHROPIC_RESPONSE)

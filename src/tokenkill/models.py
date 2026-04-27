@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -50,7 +50,7 @@ class ProviderPricing(BaseModel):
 class CostEvent(BaseModel):
     id: Optional[int] = None
     session_id: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     provider: Provider
     model: str
     usage: TokenUsage
@@ -63,8 +63,8 @@ class CostEvent(BaseModel):
 class Session(BaseModel):
     id: str
     project: str
-    started_at: datetime = Field(default_factory=datetime.utcnow)
-    last_activity: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_activity: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     total_cost_usd: float = 0.0
     total_input_tokens: int = 0
     total_output_tokens: int = 0

@@ -76,8 +76,8 @@ def create_proxy_app(
     )
     async def proxy(request: Request, path: str) -> Response:
         full_path = "/" + path
-        if request.query_string:
-            full_path += "?" + request.query_string.decode()
+        if request.url.query:
+            full_path += "?" + request.url.query
 
         # --- Dashboard passthrough (handled by dashboard router, not here) ---
         if path.startswith("dashboard") or path.startswith("api/sessions"):
@@ -140,8 +140,8 @@ def create_proxy_app(
 
         # --- Forward request upstream ---
         upstream_url = upstream_base.rstrip("/") + "/" + path
-        if request.query_string:
-            upstream_url += "?" + request.query_string.decode()
+        if request.url.query:
+            upstream_url += "?" + request.url.query
 
         forward_headers = dict(request.headers)
         # Re-attach Authorization transparently (never log it)

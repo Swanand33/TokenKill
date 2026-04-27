@@ -7,10 +7,8 @@ from tokenkill.budget import BudgetEnforcer
 from tokenkill.db import Database
 from tokenkill.tracker import CostTracker
 
-router = APIRouter(prefix="/api")
-
-
 def create_router(db: Database, tracker: CostTracker, budget: BudgetEnforcer) -> APIRouter:
+    router = APIRouter(prefix="/api")  # fresh router per call — avoids shared state across tests
     @router.get("/sessions")
     async def get_sessions():
         sessions = await db.get_recent_sessions(limit=20)

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 from typing import Optional
 
 import structlog
@@ -27,7 +31,7 @@ class CostTracker:
 
     async def start_session(self) -> str:
         session_id = str(uuid.uuid4())
-        now = datetime.utcnow()
+        now = _now()
         self._session = Session(
             id=session_id,
             project=self._project,
@@ -78,7 +82,7 @@ class CostTracker:
         self._session.total_input_tokens += usage.input_tokens
         self._session.total_output_tokens += usage.output_tokens
         self._session.event_count += 1
-        self._session.last_activity = datetime.utcnow()
+        self._session.last_activity = _now()
 
         if tool_name:
             self._cost_by_tool[tool_name] += cost
@@ -87,7 +91,7 @@ class CostTracker:
         self._cost_by_model[model] += cost
         self._cost_by_provider[provider.name] += cost
 
-        self._burn_window.append((datetime.utcnow(), cost))
+        self._burn_window.append((_now(), cost))
         self._trim_burn_window()
 
         await self._db.insert_event(event)
@@ -130,7 +134,7 @@ class CostTracker:
         )
 
     def _trim_burn_window(self) -> None:
-        cutoff = datetime.utcnow()
+        cutoff = _now()
         from datetime import timedelta
         five_min_ago = cutoff - timedelta(minutes=5)
         self._burn_window = [(t, c) for t, c in self._burn_window if t >= five_min_ago]

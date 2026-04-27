@@ -33,9 +33,9 @@ class OpenAIProvider(BaseProvider):
         )
 
     def get_pricing(self, model: str) -> ProviderPricing:
-        for key, pricing in _PRICING.items():
+        for key in sorted(_PRICING, key=len, reverse=True):  # longest match wins
             if model.startswith(key):
-                return pricing
+                return _PRICING[key]
         return _DEFAULT_PRICING
 
     def extract_model(self, response_body: dict[str, Any]) -> str:
