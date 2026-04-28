@@ -78,10 +78,8 @@ def start(
             loop_detector=loop_det,
             budget=budget_enf,
             ws_broadcast=dashboard_app.state.broadcast if hasattr(dashboard_app.state, "broadcast") else None,
+            dashboard_app=dashboard_app,
         )
-
-        # Mount dashboard under proxy app
-        proxy_app.mount("/dashboard", dashboard_app)
 
         server_config = uvicorn.Config(
             proxy_app,

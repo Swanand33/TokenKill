@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import asynccontextmanager
 from typing import Any, Optional
 
 import httpx
@@ -61,14 +62,20 @@ def create_proxy_app(
     loop_detector: LoopDetector,
     budget: BudgetEnforcer,
     ws_broadcast: Any = None,
+    dashboard_app: Any = None,
 ) -> FastAPI:
-    app = FastAPI(title="TokenKill Proxy", docs_url=None, redoc_url=None)
-
     http_client = httpx.AsyncClient(timeout=300.0, follow_redirects=True)
 
-    @app.on_event("shutdown")
-    async def _shutdown() -> None:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        yield
         await http_client.aclose()
+
+    app = FastAPI(title="TokenKill Proxy", docs_url=None, redoc_url=None, lifespan=lifespan)
+
+    # Mount dashboard BEFORE the catch-all route so it takes precedence
+    if dashboard_app is not None:
+        app.mount("/dashboard", dashboard_app)
 
     @app.api_route(
         "/{path:path}",
@@ -78,10 +85,6 @@ def create_proxy_app(
         full_path = "/" + path
         if request.url.query:
             full_path += "?" + request.url.query
-
-        # --- Dashboard passthrough (handled by dashboard router, not here) ---
-        if path.startswith("dashboard") or path.startswith("api/sessions"):
-            return Response(status_code=404)
 
         provider, upstream_base = _route_provider("/" + path, config)
 
@@ -143,7 +146,9 @@ def create_proxy_app(
         if request.url.query:
             upstream_url += "?" + request.url.query
 
-        forward_headers = dict(request.headers)
+        # Strip hop-by-hop and connection-specific headers that must not be forwarded
+        _strip_forward = {"host", "content-length", "transfer-encoding", "connection"}
+        forward_headers = {k: v for k, v in request.headers.items() if k.lower() not in _strip_forward}
         # Re-attach Authorization transparently (never log it)
         safe_log_headers = _strip_sensitive_headers(dict(request.headers))
         logger.debug("forwarding_request", provider=provider.name, path=full_path, headers=safe_log_headers)
