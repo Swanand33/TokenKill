@@ -59,6 +59,33 @@ class AnthropicProvider(BaseProvider):
 
     def extract_tool_name(self, request_body: dict[str, Any]) -> str | None:
         messages = request_body.get("messages", [])
+
+        # Build tool_use_id → name map from all assistant messages
+        tool_id_to_name: dict[str, str] = {}
+        for msg in messages:
+            if msg.get("role") == "assistant":
+                content = msg.get("content", [])
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "tool_use":
+                            tid = block.get("id", "")
+                            name = block.get("name", "")
+                            if tid and name:
+                                tool_id_to_name[tid] = name
+
+        # Most recent user message: if it has tool_result, that's the current tool
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                content = msg.get("content", [])
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "tool_result":
+                            tid = block.get("tool_use_id", "")
+                            if tid in tool_id_to_name:
+                                return tool_id_to_name[tid]
+                break  # only check the most recent user message
+
+        # Fallback: most recent tool_use anywhere
         for msg in reversed(messages):
             content = msg.get("content", [])
             if isinstance(content, list):

@@ -3,290 +3,405 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TokenKill Dashboard</title>
+  <title>TokenKill</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <style>
-    body { background: #0f172a; color: #e2e8f0; font-family: 'Menlo', 'Monaco', monospace; }
-    .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; }
-    .badge-warning { background: #f59e0b22; color: #fbbf24; border: 1px solid #f59e0b44; }
-    .badge-kill    { background: #ef444422; color: #f87171; border: 1px solid #ef444444; }
-    .badge-ok      { background: #10b98122; color: #34d399; border: 1px solid #10b98144; }
-    .progress-bar  { height: 6px; border-radius: 3px; background: #334155; overflow: hidden; }
-    .progress-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
-    .event-row:nth-child(even) { background: #1e293b55; }
-    #alert-banner { display: none; }
+    :root {
+      --bg:       #0d0d0d;
+      --surface:  #131313;
+      --border:   #1f1f1f;
+      --muted:    #2a2a2a;
+      --text:     #e8e8e8;
+      --sub:      #888;
+      --dim:      #444;
+      --amber:    #f59e0b;
+      --blue:     #60a5fa;
+      --violet:   #a78bfa;
+      --green:    #34d399;
+      --red:      #f87171;
+    }
+    * { font-family: 'Syne', sans-serif; box-sizing: border-box; }
+    .code { font-family: 'Fira Code', monospace !important; }
+    body { background: var(--bg); color: var(--text); }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+    .label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--sub);
+    }
+    .stat {
+      font-family: 'Fira Code', monospace;
+      font-size: 26px;
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: -.02em;
+    }
+
+    /* live pulse */
+    @keyframes live-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .3; }
+    }
+    .live-dot { animation: live-pulse 2s ease-in-out infinite; }
+
+    /* row hover */
+    tbody tr { transition: background 80ms; }
+    tbody tr:hover { background: rgba(255,255,255,.03); }
   </style>
 </head>
-<body class="min-h-screen p-6">
+<body class="min-h-screen antialiased">
 
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
-    <div>
-      <h1 class="text-xl font-bold text-white">⚡ TokenKill</h1>
-      <p class="text-slate-400 text-xs mt-1" id="session-id">Connecting...</p>
-    </div>
-    <div class="flex gap-3 items-center">
-      <span id="status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
-      <span id="status-text" class="text-xs text-slate-400">Disconnected</span>
-    </div>
-  </div>
+  <!-- ── Header ─────────────────────────────────────── -->
+  <header style="border-bottom:1px solid var(--border); background:rgba(13,13,13,.92); backdrop-filter:blur(8px);"
+          class="sticky top-0 z-20">
+    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
 
-  <!-- Alert Banner -->
-  <div id="alert-banner" class="mb-4 p-3 rounded-lg text-sm font-medium"></div>
+      <div class="flex items-center gap-3">
+        <i data-lucide="shield" style="width:16px;height:16px;color:var(--amber);"></i>
+        <span style="font-size:15px;font-weight:800;letter-spacing:-.01em;">TokenKill</span>
+        <span style="color:var(--border);margin:0 4px;">|</span>
+        <span class="code" id="session-id" style="font-size:11px;color:var(--sub);">connecting…</span>
+      </div>
 
-  <!-- KPI Cards -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    <div class="card">
-      <div class="text-slate-400 text-xs mb-1">Session Cost</div>
-      <div class="text-2xl font-bold text-white" id="session-cost">$0.0000</div>
-      <div class="text-xs text-slate-500 mt-1" id="burn-rate">—</div>
-    </div>
-    <div class="card">
-      <div class="text-slate-400 text-xs mb-1">Input Tokens</div>
-      <div class="text-2xl font-bold text-blue-400" id="input-tokens">0</div>
-    </div>
-    <div class="card">
-      <div class="text-slate-400 text-xs mb-1">Output Tokens</div>
-      <div class="text-2xl font-bold text-purple-400" id="output-tokens">0</div>
-    </div>
-    <div class="card">
-      <div class="text-slate-400 text-xs mb-1">Requests</div>
-      <div class="text-2xl font-bold text-slate-200" id="request-count">0</div>
-    </div>
-  </div>
+      <div class="flex items-center gap-2">
+        <span id="status-dot" class="live-dot" style="width:6px;height:6px;border-radius:50%;background:var(--dim);display:inline-block;"></span>
+        <span class="label" id="status-text">offline</span>
+      </div>
 
-  <!-- Budget Bar -->
-  <div class="card mb-6" id="budget-section">
-    <div class="flex justify-between items-center mb-2">
-      <span class="text-xs text-slate-400">Budget</span>
-      <span class="text-xs" id="budget-label">No cap set</span>
     </div>
-    <div class="progress-bar">
-      <div class="progress-fill bg-green-500" id="budget-fill" style="width:0%"></div>
-    </div>
-    <div class="text-xs text-slate-500 mt-1" id="budget-eta"></div>
-  </div>
+  </header>
 
-  <!-- Charts + Cost Tree -->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-    <div class="card">
-      <div class="text-xs text-slate-400 mb-3">Cost Over Time</div>
-      <canvas id="cost-chart" height="140"></canvas>
-    </div>
-    <div class="card">
-      <div class="text-xs text-slate-400 mb-3">Cost by Provider</div>
-      <canvas id="provider-chart" height="140"></canvas>
-    </div>
-  </div>
+  <main class="max-w-6xl mx-auto px-6 py-8" style="display:flex;flex-direction:column;gap:16px;">
 
-  <!-- Cost Tree -->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-    <div class="card">
-      <div class="text-xs text-slate-400 mb-3">Top Tools (by cost)</div>
-      <div id="tool-list" class="text-xs space-y-1"></div>
+    <!-- ── Alert ───────────────────────────────────────── -->
+    <div id="alert-banner" class="hidden" style="border-radius:8px;border:1px solid;padding:12px 16px;display:none;align-items:center;gap:10px;">
+      <i data-lucide="alert-triangle" style="width:15px;height:15px;shrink:0;"></i>
+      <div>
+        <p style="font-size:12px;font-weight:700;margin:0;" id="alert-title"></p>
+        <p class="code" style="font-size:11px;margin:2px 0 0;opacity:.75;" id="alert-text"></p>
+      </div>
     </div>
-    <div class="card">
-      <div class="text-xs text-slate-400 mb-3">Top Files (by read cost)</div>
-      <div id="file-list" class="text-xs space-y-1"></div>
-    </div>
-  </div>
 
-  <!-- Recent Events -->
-  <div class="card">
-    <div class="text-xs text-slate-400 mb-3">Recent Events</div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-xs">
-        <thead>
-          <tr class="text-slate-500 border-b border-slate-700">
-            <th class="text-left pb-2">Time</th>
-            <th class="text-left pb-2">Provider</th>
-            <th class="text-left pb-2">Model</th>
-            <th class="text-right pb-2">In</th>
-            <th class="text-right pb-2">Out</th>
-            <th class="text-right pb-2">Cost</th>
-            <th class="text-left pb-2">Tool</th>
-          </tr>
-        </thead>
-        <tbody id="events-table"></tbody>
-      </table>
+    <!-- ── KPI row ─────────────────────────────────────── -->
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;" class="lg-4-col">
+      <style>.lg-4-col { } @media(min-width:900px){.lg-4-col{grid-template-columns:repeat(4,1fr)!important;}}</style>
+
+      <div class="card" style="padding:20px 22px;">
+        <div class="label" style="display:flex;align-items:center;gap:6px;margin-bottom:16px;">
+          <i data-lucide="circle-dollar-sign" style="width:11px;height:11px;"></i> Session Cost
+        </div>
+        <div class="stat" id="session-cost" style="color:var(--amber);">$0.0000</div>
+        <div class="code" id="burn-rate" style="font-size:10px;color:var(--dim);margin-top:6px;">—</div>
+      </div>
+
+      <div class="card" style="padding:20px 22px;">
+        <div class="label" style="display:flex;align-items:center;gap:6px;margin-bottom:16px;">
+          <i data-lucide="arrow-down-to-line" style="width:11px;height:11px;"></i> Input Tokens
+        </div>
+        <div class="stat code" id="input-tokens" style="color:var(--blue);">0</div>
+        <div style="font-size:10px;color:var(--dim);margin-top:6px;">tokens</div>
+      </div>
+
+      <div class="card" style="padding:20px 22px;">
+        <div class="label" style="display:flex;align-items:center;gap:6px;margin-bottom:16px;">
+          <i data-lucide="arrow-up-from-line" style="width:11px;height:11px;"></i> Output Tokens
+        </div>
+        <div class="stat code" id="output-tokens" style="color:var(--violet);">0</div>
+        <div style="font-size:10px;color:var(--dim);margin-top:6px;">tokens</div>
+      </div>
+
+      <div class="card" style="padding:20px 22px;">
+        <div class="label" style="display:flex;align-items:center;gap:6px;margin-bottom:16px;">
+          <i data-lucide="layers" style="width:11px;height:11px;"></i> Requests
+        </div>
+        <div class="stat code" id="request-count">0</div>
+        <div style="font-size:10px;color:var(--dim);margin-top:6px;">intercepted</div>
+      </div>
+
     </div>
-  </div>
+
+    <!-- ── Budget ──────────────────────────────────────── -->
+    <div class="card" style="padding:16px 22px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="label" style="display:flex;align-items:center;gap:6px;">
+          <i data-lucide="gauge" style="width:11px;height:11px;"></i> Budget
+        </div>
+        <span class="code" id="budget-label" style="font-size:11px;color:var(--sub);">No cap set</span>
+      </div>
+      <div style="height:3px;background:var(--muted);border-radius:2px;overflow:hidden;">
+        <div id="budget-fill" style="height:100%;width:0%;background:var(--green);border-radius:2px;transition:width .5s ease,background .3s;"></div>
+      </div>
+      <div class="code" id="budget-eta" style="font-size:10px;color:var(--dim);margin-top:6px;"></div>
+    </div>
+
+    <!-- ── Charts ─────────────────────────────────────── -->
+    <div style="display:grid;grid-template-columns:1fr;gap:12px;" class="charts-grid">
+      <style>@media(min-width:768px){.charts-grid{grid-template-columns:3fr 2fr!important;}}</style>
+
+      <div class="card" style="padding:20px 22px;">
+        <div class="label" style="display:flex;align-items:center;gap:6px;margin-bottom:16px;">
+          <i data-lucide="trending-up" style="width:11px;height:11px;"></i> Cost Over Time
+        </div>
+        <canvas id="cost-chart" height="100"></canvas>
+      </div>
+
+      <div class="card" style="padding:20px 22px;">
+        <div class="label" style="display:flex;align-items:center;gap:6px;margin-bottom:16px;">
+          <i data-lucide="pie-chart" style="width:11px;height:11px;"></i> By Provider
+        </div>
+        <canvas id="provider-chart" height="100"></canvas>
+      </div>
+
+    </div>
+
+    <!-- ── Attribution ────────────────────────────────── -->
+    <div style="display:grid;grid-template-columns:1fr;gap:12px;" class="attr-grid">
+      <style>@media(min-width:640px){.attr-grid{grid-template-columns:1fr 1fr!important;}}</style>
+
+      <div class="card" style="padding:20px 22px;">
+        <div class="label" style="display:flex;align-items:center;gap:6px;margin-bottom:16px;">
+          <i data-lucide="wrench" style="width:11px;height:11px;"></i> Top Tools
+        </div>
+        <div id="tool-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+
+      <div class="card" style="padding:20px 22px;">
+        <div class="label" style="display:flex;align-items:center;gap:6px;margin-bottom:16px;">
+          <i data-lucide="file-text" style="width:11px;height:11px;"></i> Top Files
+        </div>
+        <div id="file-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+
+    </div>
+
+    <!-- ── Events ─────────────────────────────────────── -->
+    <div class="card" style="overflow:hidden;">
+      <div style="padding:14px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;">
+        <i data-lucide="list" style="width:11px;height:11px;color:var(--sub);"></i>
+        <span class="label">Recent Events</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th class="label" style="text-align:left;padding:10px 22px;font-weight:700;">Time</th>
+              <th class="label" style="text-align:left;padding:10px 8px;">Provider</th>
+              <th class="label" style="text-align:left;padding:10px 8px;">Model</th>
+              <th class="label" style="text-align:right;padding:10px 8px;">In</th>
+              <th class="label" style="text-align:right;padding:10px 8px;">Out</th>
+              <th class="label" style="text-align:right;padding:10px 8px;">Cost</th>
+              <th class="label" style="text-align:left;padding:10px 8px;padding-right:22px;">Tool</th>
+            </tr>
+          </thead>
+          <tbody id="events-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
 
 <script>
-  // ---- State ----
+  // ── State ──────────────────────────────────────────────
   let totalCost = 0, inputTokens = 0, outputTokens = 0, requestCount = 0;
   let costHistory = [], providerCosts = {}, toolCosts = {}, fileCosts = {};
   let sessionId = null;
 
-  // ---- Charts ----
-  const costCtx = document.getElementById('cost-chart').getContext('2d');
-  const costChart = new Chart(costCtx, {
+  // ── Charts ─────────────────────────────────────────────
+  const G = '#1f1f1f', T = '#555', FIRA = 'Fira Code, monospace';
+
+  const costChart = new Chart(document.getElementById('cost-chart').getContext('2d'), {
     type: 'line',
-    data: { labels: [], datasets: [{ label: 'Cost $', data: [], borderColor: '#34d399', tension: 0.4, fill: true, backgroundColor: '#34d39922', pointRadius: 2 }] },
-    options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } }, y: { ticks: { color: '#64748b', font: { size: 10 }, callback: v => '$' + v.toFixed(4) }, grid: { color: '#334155' } } }, animation: false }
+    data: { labels: [], datasets: [{ data: [], borderColor: '#f59e0b', borderWidth: 1.5,
+      tension: 0.4, fill: true, backgroundColor: 'rgba(245,158,11,.06)',
+      pointRadius: 0, pointHoverRadius: 3, pointHoverBackgroundColor: '#f59e0b' }] },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: T, font: { size: 9, family: FIRA }, maxTicksLimit: 7, maxRotation: 0 },
+             grid: { color: G }, border: { color: G } },
+        y: { ticks: { color: T, font: { size: 9, family: FIRA }, callback: v => '$'+v.toFixed(4) },
+             grid: { color: G }, border: { color: G } }
+      },
+      animation: false, interaction: { mode: 'index', intersect: false },
+    }
   });
 
-  const provCtx = document.getElementById('provider-chart').getContext('2d');
-  const provChart = new Chart(provCtx, {
+  const provChart = new Chart(document.getElementById('provider-chart').getContext('2d'), {
     type: 'doughnut',
-    data: { labels: [], datasets: [{ data: [], backgroundColor: ['#34d399','#60a5fa','#f59e0b','#a78bfa'] }] },
-    options: { plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } }, animation: false }
+    data: { labels: [], datasets: [{ data: [],
+      backgroundColor: ['#f59e0b','#60a5fa','#34d399','#a78bfa'],
+      borderColor: '#131313', borderWidth: 3 }] },
+    options: {
+      plugins: { legend: { labels: { color: '#888', font: { size: 11, family: 'Syne, sans-serif' },
+        padding: 14, boxWidth: 8, boxHeight: 8 } } },
+      cutout: '70%', animation: false,
+    }
   });
 
-  // ---- WebSocket ----
+  // ── WebSocket ──────────────────────────────────────────
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}/dashboard/ws`);
-
-    ws.onopen = () => {
-      document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-green-400';
-      document.getElementById('status-text').textContent = 'Live';
-      loadCurrent();
-    };
-
-    ws.onclose = () => {
-      document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
-      document.getElementById('status-text').textContent = 'Disconnected';
-      setTimeout(connect, 3000);
-    };
-
-    ws.onmessage = (e) => {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'cost_event') handleEvent(msg);
-    };
-
+    ws.onopen  = () => { setStatus(true);  loadCurrent(); };
+    ws.onclose = () => { setStatus(false); setTimeout(connect, 3000); };
+    ws.onmessage = e => { const m = JSON.parse(e.data); if (m.type === 'cost_event') handleEvent(m); };
     setInterval(() => { if (ws.readyState === 1) ws.send('ping'); }, 20000);
   }
 
-  // ---- Load current session on connect ----
+  function setStatus(live) {
+    document.getElementById('status-dot').style.background = live ? 'var(--green)' : 'var(--dim)';
+    document.getElementById('status-text').textContent     = live ? 'live' : 'offline';
+    document.getElementById('status-text').style.color     = live ? 'var(--green)' : 'var(--sub)';
+  }
+
+  // ── Load session ───────────────────────────────────────
   async function loadCurrent() {
-    const r = await fetch('/dashboard/api/current');
-    const data = await r.json();
+    const [curR, budR] = await Promise.all([
+      fetch('/dashboard/api/current'),
+      fetch('/dashboard/api/budget'),
+    ]);
+    const data   = await curR.json();
+    const budget = await budR.json();
+    renderBudget(budget);
     if (!data.active) return;
 
     const s = data.session;
-    sessionId = s.id;
-    document.getElementById('session-id').textContent = `Session: ${s.id.slice(0,8)}...  |  Project: ${s.project}`;
-    totalCost = s.total_cost_usd;
-    inputTokens = s.total_input_tokens;
+    sessionId    = s.id;
+    totalCost    = s.total_cost_usd;
+    inputTokens  = s.total_input_tokens;
     outputTokens = s.total_output_tokens;
     requestCount = s.event_count;
+    document.getElementById('session-id').textContent = `${s.id.slice(0,8)} · ${s.project}`;
 
     if (data.cost_tree) {
       providerCosts = data.cost_tree.by_provider || {};
-      toolCosts = data.cost_tree.by_tool || {};
-      fileCosts = data.cost_tree.by_file || {};
+      toolCosts     = data.cost_tree.by_tool     || {};
+      fileCosts     = data.cost_tree.by_file      || {};
     }
+
+    try {
+      const evR    = await fetch(`/dashboard/api/sessions/${sessionId}/events`);
+      const events = await evR.json();
+      let run = 0;
+      costHistory = events.map(ev => { run += ev.cost_usd; return { t: new Date(ev.timestamp).toLocaleTimeString(), c: run }; });
+      if (costHistory.length > 60) costHistory = costHistory.slice(-60);
+      const tbody = document.getElementById('events-table');
+      tbody.innerHTML = '';
+      events.slice(-50).reverse().forEach(ev => tbody.appendChild(buildRow(ev)));
+    } catch (_) {}
 
     renderAll();
   }
 
-  // ---- Handle incoming event ----
+  // ── Live event ─────────────────────────────────────────
   function handleEvent(msg) {
-    const ev = msg.event;
-    const budget = msg.budget;
-
-    totalCost += ev.cost_usd;
-    inputTokens += ev.usage.input_tokens;
+    const ev = msg.event, b = msg.budget;
+    totalCost    += ev.cost_usd;
+    inputTokens  += ev.usage.input_tokens;
     outputTokens += ev.usage.output_tokens;
     requestCount += 1;
-
     providerCosts[ev.provider] = (providerCosts[ev.provider] || 0) + ev.cost_usd;
     if (ev.tool_name) toolCosts[ev.tool_name] = (toolCosts[ev.tool_name] || 0) + ev.cost_usd;
     if (ev.file_path) fileCosts[ev.file_path] = (fileCosts[ev.file_path] || 0) + ev.cost_usd;
-
-    costHistory.push({ time: new Date().toLocaleTimeString(), cost: totalCost });
+    costHistory.push({ t: new Date().toLocaleTimeString(), c: totalCost });
     if (costHistory.length > 60) costHistory.shift();
-
-    renderAll();
-    renderBudget(budget);
-    prependEvent(ev);
-
-    if (msg.loop_alert) showAlert(msg.loop_alert);
-    else clearAlert();
+    renderAll(); renderBudget(b); prependEvent(ev);
+    if (msg.loop_alert) showAlert(msg.loop_alert); else clearAlert();
   }
 
+  // ── Render ─────────────────────────────────────────────
   function renderAll() {
-    document.getElementById('session-cost').textContent = '$' + totalCost.toFixed(4);
-    document.getElementById('input-tokens').textContent = inputTokens.toLocaleString();
+    document.getElementById('session-cost').textContent  = '$' + totalCost.toFixed(4);
+    document.getElementById('input-tokens').textContent  = inputTokens.toLocaleString();
     document.getElementById('output-tokens').textContent = outputTokens.toLocaleString();
     document.getElementById('request-count').textContent = requestCount.toLocaleString();
 
-    // Cost chart
-    costChart.data.labels = costHistory.map(h => h.time);
-    costChart.data.datasets[0].data = costHistory.map(h => h.cost);
+    costChart.data.labels           = costHistory.map(h => h.t);
+    costChart.data.datasets[0].data = costHistory.map(h => h.c);
     costChart.update();
 
-    // Provider doughnut
-    const pKeys = Object.keys(providerCosts);
-    provChart.data.labels = pKeys;
-    provChart.data.datasets[0].data = pKeys.map(k => providerCosts[k]);
+    const pk = Object.keys(providerCosts);
+    provChart.data.labels           = pk;
+    provChart.data.datasets[0].data = pk.map(k => providerCosts[k]);
     provChart.update();
 
-    // Tool list
-    renderCostList('tool-list', toolCosts);
-    renderCostList('file-list', fileCosts);
+    renderList('tool-list', toolCosts);
+    renderList('file-list', fileCosts);
   }
 
-  function renderCostList(elId, costs) {
-    const el = document.getElementById(elId);
-    const sorted = Object.entries(costs).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    if (!sorted.length) { el.innerHTML = '<span class="text-slate-600">No data yet</span>'; return; }
+  function renderList(id, costs) {
+    const el     = document.getElementById(id);
+    const sorted = Object.entries(costs).sort((a,b) => b[1]-a[1]).slice(0,8);
+    if (!sorted.length) { el.innerHTML = '<span style="font-size:11px;color:var(--dim);">No data yet</span>'; return; }
     const max = sorted[0][1];
-    el.innerHTML = sorted.map(([k, v]) => `
-      <div class="event-row flex justify-between items-center py-1 px-1 rounded">
-        <span class="text-slate-300 truncate max-w-[200px]" title="${k}">${k}</span>
-        <span class="text-green-400 ml-2 shrink-0">$${v.toFixed(4)}</span>
+    el.innerHTML = sorted.map(([k,v]) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="flex:1;min-width:0;">
+          <p style="font-size:11px;font-family:Fira Code,monospace;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 0 4px;" title="${k}">${k}</p>
+          <div style="height:2px;background:var(--muted);border-radius:1px;overflow:hidden;">
+            <div style="height:100%;width:${(v/max*100).toFixed(1)}%;background:var(--border);border-radius:1px;"></div>
+          </div>
+        </div>
+        <span style="font-size:11px;font-family:Fira Code,monospace;color:var(--amber);white-space:nowrap;">$${v.toFixed(4)}</span>
       </div>`).join('');
   }
 
   function renderBudget(b) {
+    const label = document.getElementById('budget-label');
+    const fill  = document.getElementById('budget-fill');
+    const eta   = document.getElementById('budget-eta');
     if (!b.session_cap && !b.project_cap) {
-      document.getElementById('budget-label').textContent = 'No cap set';
-      return;
+      label.textContent = 'no cap set'; fill.style.width = '0%'; eta.textContent = ''; return;
     }
     const pct = b.session_pct || b.project_pct || 0;
-    const pctDisplay = Math.min(pct * 100, 100).toFixed(1);
-    document.getElementById('budget-label').textContent =
-      `$${(b.session_spent).toFixed(4)} / $${(b.session_cap || b.project_cap).toFixed(2)} (${pctDisplay}%)`;
+    const pctD = Math.min(pct*100,100).toFixed(1);
+    const cap  = b.session_cap || b.project_cap;
+    label.textContent = `$${(b.session_spent||0).toFixed(4)} / $${cap.toFixed(2)}  (${pctD}%)`;
+    fill.style.width      = pctD + '%';
+    fill.style.background = pct >= 1.0 ? 'var(--red)' : pct >= 0.8 ? '#f59e0b' : 'var(--green)';
+    if (b.estimated_minutes_remaining != null) eta.textContent = `~${b.estimated_minutes_remaining.toFixed(0)} min remaining`;
+    if (b.burn_rate) document.getElementById('burn-rate').textContent = `$${b.burn_rate.toFixed(4)}/min`;
+  }
 
-    const fill = document.getElementById('budget-fill');
-    fill.style.width = pctDisplay + '%';
-    fill.className = 'progress-fill ' + (pct >= 1.0 ? 'bg-red-500' : pct >= 0.8 ? 'bg-yellow-400' : 'bg-green-500');
-
-    if (b.estimated_minutes_remaining != null) {
-      document.getElementById('budget-eta').textContent = `~${b.estimated_minutes_remaining.toFixed(0)} min remaining`;
-    }
-    if (b.burn_rate) {
-      document.getElementById('burn-rate').textContent = `$${b.burn_rate.toFixed(4)}/min`;
-    }
+  // ── Events table ───────────────────────────────────────
+  function buildRow(ev) {
+    const tr = document.createElement('tr');
+    tr.style.cssText = 'border-bottom:1px solid var(--border);';
+    tr.innerHTML = `
+      <td style="padding:10px 22px;font-family:Fira Code,monospace;font-size:10px;color:var(--dim);white-space:nowrap;">${new Date(ev.timestamp).toLocaleTimeString()}</td>
+      <td style="padding:10px 8px;font-size:11px;font-weight:700;color:var(--blue);text-transform:capitalize;">${ev.provider}</td>
+      <td style="padding:10px 8px;font-family:Fira Code,monospace;font-size:10px;color:#999;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${ev.model}">${ev.model}</td>
+      <td style="padding:10px 8px;text-align:right;font-family:Fira Code,monospace;font-size:11px;color:#777;">${(ev.usage?.input_tokens||0).toLocaleString()}</td>
+      <td style="padding:10px 8px;text-align:right;font-family:Fira Code,monospace;font-size:11px;color:#777;">${(ev.usage?.output_tokens||0).toLocaleString()}</td>
+      <td style="padding:10px 8px;text-align:right;font-family:Fira Code,monospace;font-size:11px;color:var(--amber);font-weight:500;">$${ev.cost_usd.toFixed(4)}</td>
+      <td style="padding:10px 8px;padding-right:22px;font-family:Fira Code,monospace;font-size:10px;color:var(--dim);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${ev.tool_name||''}">${ev.tool_name||'—'}</td>`;
+    return tr;
   }
 
   function prependEvent(ev) {
     const tbody = document.getElementById('events-table');
-    const time = new Date(ev.timestamp).toLocaleTimeString();
-    const row = document.createElement('tr');
-    row.className = 'event-row border-b border-slate-800';
-    row.innerHTML = `
-      <td class="py-1 text-slate-500">${time}</td>
-      <td class="py-1 text-blue-400">${ev.provider}</td>
-      <td class="py-1 text-slate-300 truncate max-w-[120px]">${ev.model}</td>
-      <td class="py-1 text-right text-slate-300">${(ev.usage.input_tokens||0).toLocaleString()}</td>
-      <td class="py-1 text-right text-slate-300">${(ev.usage.output_tokens||0).toLocaleString()}</td>
-      <td class="py-1 text-right text-green-400">$${ev.cost_usd.toFixed(4)}</td>
-      <td class="py-1 text-slate-500 truncate max-w-[100px]">${ev.tool_name || '—'}</td>`;
-    tbody.prepend(row);
-    // Keep only last 50 rows
-    while (tbody.rows.length > 50) tbody.deleteRow(tbody.rows.length - 1);
+    tbody.prepend(buildRow(ev));
+    while (tbody.rows.length > 50) tbody.deleteRow(tbody.rows.length-1);
   }
 
+  // ── Alert ──────────────────────────────────────────────
   function showAlert(alert) {
-    const banner = document.getElementById('alert-banner');
-    banner.style.display = 'block';
-    banner.className = 'mb-4 p-3 rounded-lg text-sm font-medium ' +
-      (alert.level === 'kill' ? 'badge-kill' : alert.level === 'pause' ? 'badge-warning' : 'badge-warning');
-    banner.textContent = '⚠ ' + alert.message;
+    const b = document.getElementById('alert-banner');
+    const isKill = alert.level === 'kill';
+    b.style.cssText = `display:flex;border-radius:8px;padding:12px 16px;align-items:center;gap:10px;border:1px solid ${isKill?'rgba(248,113,113,.25)':'rgba(245,158,11,.25)'};background:${isKill?'rgba(248,113,113,.06)':'rgba(245,158,11,.06)'};color:${isKill?'var(--red)':'var(--amber)'};`;
+    document.getElementById('alert-title').textContent = isKill ? 'Loop Kill' : 'Loop Warning';
+    document.getElementById('alert-text').textContent  = alert.message;
   }
 
   function clearAlert() {
@@ -294,6 +409,7 @@
   }
 
   connect();
+  lucide.createIcons();
 </script>
 </body>
 </html>

@@ -282,7 +282,7 @@ async def _handle_streaming(
                         pass
 
         # Record after stream ends
-        if accumulated_usage.total_tokens > 0:
+        if accumulated_usage.has_usage:
             tool_name = provider.extract_tool_name(request_body)
             await tracker.record(
                 provider=provider,

@@ -31,6 +31,10 @@ class TokenUsage(BaseModel):
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
 
+    @property
+    def has_usage(self) -> bool:
+        return bool(self.input_tokens or self.output_tokens or self.cache_creation_tokens or self.cache_read_tokens)
+
     def cost(self, pricing: ProviderPricing) -> float:
         return (
             (self.input_tokens / 1_000_000) * pricing.input_per_mtok
@@ -92,6 +96,7 @@ class BudgetStatus(BaseModel):
     warning_triggered: bool
     cap_exceeded: bool
     estimated_minutes_remaining: Optional[float]
+    burn_rate: Optional[float] = None
 
 
 class CostTree(BaseModel):

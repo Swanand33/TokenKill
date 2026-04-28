@@ -82,7 +82,7 @@ def create_dashboard_app(
     @app.get("/", response_class=HTMLResponse)
     async def dashboard_index() -> HTMLResponse:
         index = _STATIC_DIR / "index.html"
-        return HTMLResponse(index.read_text())
+        return HTMLResponse(index.read_text(encoding="utf-8"))
 
     if _STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

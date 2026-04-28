@@ -58,6 +58,7 @@ class BudgetEnforcer:
             warning_triggered=warning_triggered,
             cap_exceeded=cap_exceeded,
             estimated_minutes_remaining=estimated_minutes,
+            burn_rate=burn_rate_per_minute,
         )
 
         if cap_exceeded:
